@@ -12,7 +12,7 @@ func main() {
 
 	flag.StringVar(&cfg.BindAddr, "bind-addr", "0.0.0.0", "Address to bind the server")
 	flag.StringVar(&cfg.BindPort, "bind-port", "1337", "Port to bind the server")
-	flag.StringVar(&cfg.AcceptAddr, "accept-addr", "127.0.0.1", "Address allowed to connect")
+	flag.StringVar(&cfg.AcceptAddr, "accept-addr", "0.0.0.0", "Address, addresses (comma-separated) or subnetwork allowed to connect")
 	flag.StringVar(&cfg.Password, "password", "", "Optional password")
 
 	flag.Parse()
