@@ -3,11 +3,11 @@ package session
 import (
 	"bytes"
 	"fmt"
+	"gonduit/command"
+	"gonduit/style"
+	"gonduit/util"
 	"log"
 	"net"
-	"shells/command"
-	"shells/style"
-	"shells/util"
 	"strings"
 )
 

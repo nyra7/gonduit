@@ -1,4 +1,4 @@
-module shells
+module gonduit
 
 go 1.25
 

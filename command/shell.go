@@ -3,14 +3,14 @@ package command
 import (
 	"errors"
 	"fmt"
+	"gonduit/style"
+	"gonduit/util"
 	"io"
 	"log"
 	"net"
 	"os"
 	"os/exec"
 	"runtime"
-	"shells/style"
-	"shells/util"
 	"slices"
 	"strings"
 	"time"
@@ -24,38 +24,39 @@ func MakeShellCommand() Handler {
 	desc := fmt.Sprintf("The path of the shell to execute (default: %s)", shells[0])
 
 	args := []Argument{
-		NewArgument("path", desc, true, false),
-		NewArgument("list", "List all valid shells", false, false),
+		NewArgument("path", desc, ArgTypeString, false),
 	}
 
-	return NewHandler("shell", shell, "Spawns a new shell", args)
+	flags := []Argument{
+		NewArgument("list", "List all valid shells", ArgTypeBool, false),
+	}
+
+	return NewHandler("shell", shell, "Spawns a new shell", args, flags)
 
 }
 
-func shell(conn net.Conn, args []string) (string, error) {
-
-	if len(args) > 2 {
-		return "", NewError(ErrBadUsage, "bad usage: shell %s", strings.Join(args, " "))
-	}
+func shell(ctx *Context) error {
 
 	var err error
 
 	shells, err := util.GetValidShells()
 
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	target := shells[0]
 
-	listIndex := slices.Index(args, "--list")
+	list := ctx.BoolFlag("list")
 
-	if listIndex != -1 {
-		util.WriteConn(conn, fmt.Sprintf("Valid shells:\n%s", style.BoldWhite.Apply(strings.Join(shells, "\n"))))
-		return "", nil
+	if list {
+		util.WriteConn(ctx.Conn, fmt.Sprintf("Valid shells:\n%s\n", style.BoldWhite.Apply(strings.Join(shells, "\n"))))
+		return nil
 	}
 
-	if len(args) == 1 {
+	requested, err := ctx.Next()
+
+	if err == nil {
 
 		index := slices.IndexFunc(shells, func(s string) bool {
 
@@ -66,57 +67,56 @@ func shell(conn net.Conn, args []string) (string, error) {
 				}
 				basename := slc[len(slc)-1]
 				basenameNoExt, _ := strings.CutSuffix(basename, ".exe")
-				return s == args[0] || basename == args[0] || basenameNoExt == args[0]
+				return s == requested || basename == requested || basenameNoExt == requested
 			}
 
 			slc := strings.Split(s, "/")
-			return s == args[0] || slc[len(slc)-1] == args[0]
+			return s == requested || slc[len(slc)-1] == requested
 		})
 
 		if index == -1 {
-			return "", NewError(ErrUnknownHandler, "invalid shell '%s'", args[0])
+			return NewError(ErrUnknownHandler, "invalid shell '%s'. Use --list to show available shells", requested)
 		}
 
 		target = shells[index]
 
 	}
 
-	util.WriteInfo(conn, fmt.Sprintf("Spawning %s...\n", target))
+	util.WriteInfo(ctx.Conn, fmt.Sprintf("Spawning %s...\n", target))
 
 	if runtime.GOOS == "windows" {
-		return spawnWindows(conn, target)
+		return spawnWindows(ctx.Conn, target)
 	}
 
-	return spawnUnix(conn, target)
+	return spawnUnix(ctx.Conn, target)
 
 }
 
-// TODO: combine common functionality with spawnUnix
+func spawnWindows(conn net.Conn, shellPath string) error {
 
-func spawnWindows(conn net.Conn, shellPath string) (string, error) {
 	cmd := exec.Command(shellPath)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return "", fmt.Errorf("error creating stdin pipe: %v", err)
+		return fmt.Errorf("error creating stdin pipe: %v", err)
 	}
 	defer stdin.Close()
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return "", fmt.Errorf("error creating stdout pipe: %v", err)
+		return fmt.Errorf("error creating stdout pipe: %v", err)
 	}
 	defer stdout.Close()
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return "", fmt.Errorf("error creating stderr pipe: %v", err)
+		return fmt.Errorf("error creating stderr pipe: %v", err)
 	}
 	defer stderr.Close()
 
 	// Start the shell
-	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("error spawning shell: %v", err)
+	if err = cmd.Start(); err != nil {
+		return fmt.Errorf("error spawning shell: %v", err)
 	}
 
 	go func() {
@@ -127,45 +127,25 @@ func spawnWindows(conn net.Conn, shellPath string) (string, error) {
 		_, _ = io.Copy(conn, stderr)
 	}()
 
-	// Handle connection input -> stdin
 	go func() {
-		defer stdin.Close()
 		_, _ = io.Copy(stdin, conn)
 	}()
 
-	err = cmd.Wait()
-	exitCode := 0
-
-	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			exitCode = exitErr.ExitCode()
-		}
-	}
-
-	_ = conn.SetReadDeadline(time.Now())
-	_, _ = io.Copy(io.Discard, conn)
-	_ = conn.SetReadDeadline(time.Time{})
-
-	if exitCode == 0 {
-		return fmt.Sprintf("shell exited with code %d", exitCode), nil
-	}
-
-	return "", fmt.Errorf("shell exited with code %d", exitCode)
+	return waitForCommand(conn, cmd)
 
 }
 
-func spawnUnix(conn net.Conn, shell string) (string, error) {
+func spawnUnix(conn net.Conn, shell string) error {
 
-	cmd := exec.Command(shell, "-i")
+	cmd := exec.Command(shell)
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, "TERM=vt100")
+	cmd.Env = append(cmd.Env, "TERM=xterm-256color")
 
 	ptmx, err := pty.Start(cmd)
 
 	if err != nil {
 		log.Println("pty error:", err)
-		return "", fmt.Errorf("error spawning shell: %v\n", err)
+		return fmt.Errorf("error spawning shell: %v\n", err)
 	}
 
 	defer ptmx.Close()
@@ -176,8 +156,13 @@ func spawnUnix(conn net.Conn, shell string) (string, error) {
 	}()
 	_, _ = io.Copy(conn, ptmx)
 
-	err = cmd.Wait()
+	return waitForCommand(conn, cmd)
 
+}
+
+func waitForCommand(conn net.Conn, cmd *exec.Cmd) error {
+
+	err := cmd.Wait()
 	exitCode := 0
 
 	if err != nil {
@@ -192,9 +177,10 @@ func spawnUnix(conn net.Conn, shell string) (string, error) {
 	_ = conn.SetReadDeadline(time.Time{})
 
 	if exitCode == 0 {
-		return fmt.Sprintf("shell exited with code %d", exitCode), nil
+		util.WriteSuccess(conn, "shell exited with code 0\n")
+		return nil
 	}
 
-	return "", fmt.Errorf("shell exited with code %d", exitCode)
+	return fmt.Errorf("shell exited with code %d", exitCode)
 
 }

@@ -9,7 +9,7 @@ ARCHES := 386 amd64 arm64
 BIN := bin
 
 # Source file
-SRC := cmd/main.go
+SRC := cmd/server.go
 
 # Version information
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -18,9 +18,9 @@ BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Build flags for optimization and size reduction
 LDFLAGS := -s -w -extldflags=-static \
-	-X 'pkg.Version=$(VERSION)' \
-	-X 'pkg.Commit=$(COMMIT)' \
-	-X 'pkg.BuildDate=$(BUILD_DATE)'
+	-X 'gonduit/pkg.Version=$(VERSION)' \
+	-X 'gonduit/pkg.Commit=$(COMMIT)' \
+	-X 'gonduit/pkg.BuildDate=$(BUILD_DATE)'
 
 GCFLAGS := -trimpath
 ASMFLAGS := -trimpath

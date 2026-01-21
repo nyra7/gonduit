@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	"shells/command"
-	"shells/session"
+	"gonduit/command"
+	"gonduit/session"
 )
 
 func main() {

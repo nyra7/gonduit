@@ -2,9 +2,12 @@ package command
 
 import (
 	"io"
-	"net"
 )
 
-func exit(_ net.Conn, args []string) (string, error) {
-	return "", io.EOF
+func exit(_ *Context) error {
+	return io.EOF
+}
+
+func MakeExitCommand() Handler {
+	return NewHandler("exit", exit, "Exit gonduit", []Argument{}, []Argument{})
 }
