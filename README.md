@@ -1,60 +1,66 @@
 # Gonduit
 
-A lightweight, cross-platform bind shell server written in Go. Provides shell access over TCP with optional password authentication.
+Gonduit is a Go tool for managing fully interactive shells across multiple hosts and operating systems at the same time.
+It runs over gRPC and TLS 1.3, supports optional mTLS authentication and handles file transfers in both directions, all 
+managed from a single TUI client. It is intended for use in penetration testing engagements, lab setups, and CTF 
+challenges where you need reliable shell access across different platforms.
 
 ## Features
 
-- Lightweight and fast with minimal dependencies
-- Optional password authentication
-- Cross-platform support (Linux, macOS, Windows, FreeBSD)
-- Interactive shell with PTY support on Unix systems
-- Customizable bind address and port
+- Fully interactive shells across Windows, Linux, and macOS
+- Multiple concurrent sessions with per-host isolation
+- Bidirectional file transfer
+- Bind and reverse connection modes
+- TLS 1.3 with optional mTLS and certificate fingerprint validation
+- Built-in identity and certificate management
 
-## Quick Start
-
-### Building
+## Build
 
 ```bash
 git clone https://github.com/nyra7/gonduit.git
 cd gonduit
-make
+make all
 ```
 
-### Running
+Cross-compilation is supported via `OS` and `ARCH`:
 
 ```bash
-# Basic usage, binds on 0.0.0.0:1337
-./gonduit
-
-# With password protection
-./gonduit --bind-port 1337 --password "your-password"
-
-# Accept connections from specific address with password protection
-./gonduit --bind-port 1337 --accept-addr "192.168.1.100" --password "your-password"
+make server OS=linux ARCH=amd64
+make app OS=darwin ARCH=arm64
 ```
 
-### Connecting
+## Basic Usage (Bind Mode)
 
+**Server:**
 ```bash
-nc localhost 1337
-telnet localhost 1337
-socat - TCP:localhost:1337
+# Run the server in bind mode on 0.0.0.0:1337
+gonduit-server bind
 ```
 
-## Configuration
-
-| Flag            | Description                              | Default   |
-|-----------------|------------------------------------------|-----------|
-| `--bind-addr`   | Address to bind to                       | `0.0.0.0` |
-| `--bind-port`   | Port to listen on                        | `1337`    |
-| `--password`    | Authentication password (optional)       | none      |
-| `--accept-addr` | Restrict connections to specific address | `0.0.0.0` |
-
-## Building
-
-You can quickly build the project for all platforms and architectures using the provided Makefile.
-
+**App:**
 ```bash
-make build-all
+# Run the TUI
+gonduit-app
+
+# Connect to a host on default port (1337)
+> connect <host>
 ```
 
+## Documentation
+
+See the [Wiki](../../wiki) for full usage reference, including server flags, identity management, and quickstart scenarios.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+## Future Ideas
+
+- Run shells as other users
+- Add retries for reverse connections
+- Implement simple linux privilege escalation checks (e.g. gtfobins)
+- Implement windows privilege abuse (e.g. SeTcbPrivilege, SeImpersonatePrivilege)
+
+## Known Issues
+
+The `app` does not run properly on Windows for now. Window resize messages are not dispatched in shell view and the output is not displayed properly when connecting to linux hosts.

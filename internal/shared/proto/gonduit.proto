@@ -1,0 +1,183 @@
+syntax = "proto3";
+
+package gonduit;
+
+option go_package = "shared/proto";
+
+import "google/protobuf/timestamp.proto";
+
+service GonduitService {
+  rpc Hello(HelloRequest) returns (HelloResponse);
+  rpc ShellStream(stream ShellClientMessage) returns (stream ShellServerMessage);
+  rpc UploadFile(stream TransferChunk) returns (TransferResult);
+  rpc DownloadFile(TransferRequest) returns (stream TransferChunk);
+}
+
+message HelloRequest {
+  string client_version = 1;
+}
+
+message HelloResponse {
+  HostInfo host_info = 1;
+  string server_version = 2;
+  repeated string features = 3;
+}
+
+message HostInfo {
+  string hostname = 1;
+  string username = 2;
+  string working_dir = 3;
+  string ip = 4;
+  string port = 5;
+  string network_adapter = 6;
+  OSInfo os_info = 7;
+}
+
+message OSInfo {
+  string Family = 1;
+  string Name = 2;
+  string Version = 3;
+  string Build = 4;
+  string Arch = 5;
+}
+
+message ShellClientMessage {
+  string id = 1;
+  oneof message {
+    ListShellTypes list_types = 2;
+    ListShellSessions list_sessions = 3;
+    ShellCreate create = 4;
+    ShellKill kill = 5;
+    ShellStdin stdin = 6;
+    ShellResize resize = 7;
+    ShellAttach attach = 8;
+    ShellDetach detach = 9;
+    ShellDump dump = 10;
+  }
+}
+
+message ShellServerMessage {
+  string id = 1;
+  oneof message {
+    ShellOk ok = 2;
+    ShellStdout stdout = 3;
+    ShellError error = 4;
+    ShellExited exited = 5;
+    ShellTypes types = 6;
+    ShellSessions sessions = 7;
+    ShellAttached attached = 8;
+    ShellDumpData dump = 9;
+  }
+}
+
+message ShellOk {
+  uint64 shell_id = 1;
+}
+
+message ShellExited {
+  uint64 shell_id = 1;
+  int32 exit_code = 2;
+  string reason = 3;
+}
+
+message ShellError {
+  uint64 shell_id = 1;
+  string error = 2;
+}
+
+message ShellStdin {
+  uint64 shell_id = 1;
+  bytes data = 2;
+}
+
+message ShellAttached {
+  uint64 shell_id = 1;
+  bytes data = 2;
+}
+
+message ShellStdout {
+  uint64 shell_id = 1;
+  bytes data = 2;
+}
+
+message ShellResize {
+  uint64 shell_id = 1;
+  TerminalSize size = 2;
+}
+
+message ShellAttach {
+  uint64 shell_id = 1;
+  TerminalSize size = 2;
+}
+
+message ShellDetach {
+  uint64 shell_id = 1;
+}
+
+message TerminalSize {
+  int32 rows = 1;
+  int32 columns = 2;
+}
+
+message ShellTypes {
+  repeated string names = 1;
+}
+
+message ShellSessions {
+  repeated ShellSession sessions = 1;
+}
+
+message ShellSession {
+  uint64 id = 1;
+  string path = 2;
+  bool is_attached = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message ShellCreate {
+  string path = 1;
+  repeated string args = 2;
+  TerminalSize size = 3;
+}
+
+message ShellDump {
+  uint64 shell_id = 1;
+}
+
+message ShellDumpData {
+  ShellSession session = 1;
+  bytes data = 2;
+}
+
+message ShellKill {
+  uint64 shell_id = 1;
+}
+
+message ListShellTypes {}
+message ListShellSessions {}
+
+message TransferRequest {
+  string path = 1;
+}
+
+message TransferChunk {
+  oneof chunk {
+    TransferMetadata metadata = 1;
+    bytes data = 2;
+  }
+}
+
+message TransferMetadata {
+  string filename = 1;
+  uint64 size = 2;
+  string checksum = 3;
+  bool force = 4;
+}
+
+message TransferResult {
+  bool success = 1;
+  string error = 2;
+  uint64 bytes_transferred = 3;
+}
+
+message Empty {}
