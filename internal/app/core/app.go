@@ -33,7 +33,7 @@ type gonduitApp struct {
 	// view is the main Bubble Tea view
 	view tea.View
 
-	// cmdMgr manages builtin and their execution
+	// cmdMgr manages commands and their execution
 	cmdMgr *command.Manager
 
 	// sessionMgr creates and manages grpc sessions
@@ -140,7 +140,7 @@ func NewApp() app.App {
 }
 
 func (app *gonduitApp) WelcomeMessage() string {
-	return style.Muted.Render(" Welcome to Gonduit • Type 'help' for builtin • Press Ctrl+C to cancel operations or type 'exit' to quit")
+	return style.Muted.Render(" Welcome to Gonduit • Type 'help' for commands • Press Ctrl+C to cancel operations or type 'exit' to quit")
 }
 
 // Init initializes the Bubble Tea program

@@ -215,7 +215,7 @@ func (s *Session) close(err error) error {
 
 		// If the shutdown was caused by an error other than ErrClosed or EOF, record it.
 		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
-			s.closeErr = fmt.Errorf("connection died: %w", err)
+			s.closeErr = err
 		}
 
 		// Close the read loop

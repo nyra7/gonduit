@@ -8,20 +8,11 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"runtime"
 	"shared/util"
 	"sync"
 
 	"github.com/creack/pty"
 	"golang.org/x/sys/unix"
-)
-
-// Redefine constants here instead of having 2 files targeting darwin and linux differently
-const (
-	TCGETS   uint = 0x5401
-	TCSETS   uint = 0x5402
-	TIOCGETA uint = 0x40487413
-	TIOCSETA uint = 0x80487414
 )
 
 type UnixPty struct {
@@ -36,12 +27,12 @@ func (p *UnixPty) Start(ctx context.Context, command string, args ...string) err
 
 	switch shell {
 	case "bash", "zsh", "sh":
-		args = append([]string{"-il"}, args...)
+		args = append([]string{"-i"}, args...)
 	}
 
 	cmd := exec.CommandContext(ctx, command, args...)
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
-	term, err := pty.Start(cmd)
+	term, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 24, Cols: 80})
 
 	if err != nil {
 		return err
@@ -124,13 +115,4 @@ func (p *UnixPty) SetEcho(enabled bool) error {
 
 func NewPty() Pty {
 	return &UnixPty{}
-}
-
-func termiosIoCtl() (get, set uint) {
-	// Default to BSD/macOS
-	get, set = TIOCGETA, TIOCSETA
-	if runtime.GOOS == "linux" {
-		get, set = TCGETS, TCSETS
-	}
-	return
 }

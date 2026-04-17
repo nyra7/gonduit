@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -111,10 +112,10 @@ func (s *Server) UploadFile(stream proto.GonduitService_UploadFileServer) error 
 		return status.Errorf(codes.InvalidArgument, "first message must contain metadata")
 	}
 
-	log.Infof("starting file upload: %s (%d bytes)", metadata.Filename, metadata.Size)
-
 	// Determine the actual file path
 	destPath := metadata.Filename
+
+	log.Infof("received file upload request: %s (%d bytes)", metadata.Filename, metadata.Size)
 
 	// Check if the destination is a directory
 	if info, err2 := os.Stat(destPath); err2 == nil && info.IsDir() {
@@ -122,11 +123,18 @@ func (s *Server) UploadFile(stream proto.GonduitService_UploadFileServer) error 
 	}
 
 	// Check if file already exists
-	if _, err = os.Stat(destPath); err == nil {
+	if stat, err2 := os.Stat(destPath); err2 == nil {
 		if !metadata.Force {
+			log.Errorf("refusing to upload %s: already exists", stat.Name())
 			return status.Errorf(codes.AlreadyExists, "file already exists: %s (use --force to overwrite)", destPath)
 		}
-		log.Infof("overwriting existing file: %s", destPath)
+	}
+
+	destPath, err = filepath.Abs(destPath)
+
+	if err != nil {
+		log.Errorf("failed to resolve path: %s", err)
+		return status.Errorf(codes.Internal, "failed to resolve path: %s", err)
 	}
 
 	// Create the output file
@@ -134,10 +142,14 @@ func (s *Server) UploadFile(stream proto.GonduitService_UploadFileServer) error 
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to create file: %v", err)
 	}
+
 	defer util.CloseFile(file)
 
 	hasher := sha256.New()
 	var bytesReceived uint64
+	var transferErr error
+
+	log.Infof("starting file upload: %s (%d bytes)", metadata.Filename, metadata.Size)
 
 	// Receive chunks
 	for {
@@ -148,7 +160,8 @@ func (s *Server) UploadFile(stream proto.GonduitService_UploadFileServer) error 
 		}
 
 		if err != nil {
-			return status.Errorf(codes.Internal, "failed to receive chunk: %v", err)
+			transferErr = fmt.Errorf("failed to receive chunk: %v", err)
+			break
 		}
 
 		data := msg.GetData()
@@ -158,12 +171,18 @@ func (s *Server) UploadFile(stream proto.GonduitService_UploadFileServer) error 
 
 		n, wErr := file.Write(data)
 		if wErr != nil {
-			return status.Errorf(codes.Internal, "failed to write chunk: %v", wErr)
+			transferErr = fmt.Errorf("failed to write chunk: %v", wErr)
+			break
 		}
 
 		hasher.Write(data)
 		bytesReceived += uint64(n)
 
+	}
+
+	if transferErr != nil {
+		log.Errorf("ferror while transferring: %v", transferErr)
+		return status.Errorf(codes.Internal, "error while transferring: %v", transferErr)
 	}
 
 	// Verify checksum
@@ -172,11 +191,12 @@ func (s *Server) UploadFile(stream proto.GonduitService_UploadFileServer) error 
 		return status.Errorf(codes.DataLoss, "checksum mismatch: expected %s, got %s", metadata.Checksum, actualChecksum)
 	}
 
-	log.Infof("file upload completed: %s (%d bytes)", destPath, bytesReceived)
+	log.Infof("file upload completed: %s (%d bytes)", metadata.Filename, bytesReceived)
 
 	// Send result
 	return stream.SendAndClose(&proto.TransferResult{
 		Success:          true,
+		Path:             destPath,
 		BytesTransferred: bytesReceived,
 	})
 
@@ -185,12 +205,21 @@ func (s *Server) UploadFile(stream proto.GonduitService_UploadFileServer) error 
 // DownloadFile implements file download streaming
 func (s *Server) DownloadFile(req *proto.TransferRequest, stream proto.GonduitService_DownloadFileServer) error {
 
-	log.Infof("starting file download: %s", req.Path)
+	log.Infof("received file download request: %s", req.Path)
 
 	file, err := os.Open(req.Path)
+
 	if err != nil {
-		return status.Errorf(codes.NotFound, "file not found: %v", err)
+		switch {
+		case errors.Is(err, os.ErrNotExist):
+			return status.Errorf(codes.NotFound, "%v", err)
+		case errors.Is(err, os.ErrPermission):
+			return status.Errorf(codes.PermissionDenied, "%v", err)
+		default:
+			return status.Errorf(codes.Internal, "failed to open file: %v", err)
+		}
 	}
+
 	defer util.CloseFile(file)
 
 	stat, err := file.Stat()
@@ -229,7 +258,11 @@ func (s *Server) DownloadFile(req *proto.TransferRequest, stream proto.GonduitSe
 		return status.Errorf(codes.Internal, "failed to send metadata: %v", err)
 	}
 
+	log.Infof("starting file download: %s", req.Path)
+
 	var n int
+	var transferErr error
+
 	// Send chunks
 	buf := make([]byte, 1024*1024)
 	for {
@@ -241,15 +274,22 @@ func (s *Server) DownloadFile(req *proto.TransferRequest, stream proto.GonduitSe
 				},
 			})
 			if err != nil {
-				return status.Errorf(codes.Internal, "failed to send chunk: %v", err)
+				transferErr = fmt.Errorf("failed to send chunk: %v", err)
+				break
 			}
 		}
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return status.Errorf(codes.Internal, "failed to read file: %v", err)
+			transferErr = fmt.Errorf("failed to read file: %v", err)
+			break
 		}
+	}
+
+	if transferErr != nil {
+		log.Errorf("error while transferring: %v", transferErr)
+		return status.Errorf(codes.Internal, "error while transferring: %v", transferErr)
 	}
 
 	log.Infof("file download completed: %s (%d bytes)", req.Path, stat.Size())

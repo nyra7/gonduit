@@ -22,7 +22,7 @@ func Tokenize(rawInput string, mgr *command.Manager) Context {
 	commandName := parts[0]
 	handler, err := mgr.FindHandler(commandName)
 	if err != nil {
-		// Unknown command — no further completion possible
+		// Unknown command, no further completion possible
 		return Context{Command: commandName, Type: TokenCommand, Word: ""}
 	}
 

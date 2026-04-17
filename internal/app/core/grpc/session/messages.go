@@ -221,7 +221,7 @@ func (s *Session) UploadSync(ctx context.Context, localPath, remotePath string, 
 
 	return &TransferResult{
 		LocalPath:  localPath,
-		RemotePath: remotePath,
+		RemotePath: res.Path,
 		Size:       uint64(stat.Size()),
 		Checksum:   fileChecksum,
 	}, nil
@@ -334,14 +334,14 @@ func (s *Session) AttachShell(ctx context.Context, id uint64) error {
 		}
 	}
 
-	s.activeShell = id
-
 	history, err := s.sendAttachShell(ctx, id, s.termSize())
 
 	if err != nil {
 		s.activeShell = 0
 		return fmt.Errorf("failed to attach to shell: %w", err)
 	}
+
+	s.activeShell = id
 
 	// Call the onAttach callback
 	s.listener.OnAttach(s, true)

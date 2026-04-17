@@ -93,7 +93,7 @@ func (s *Session) readLoop() {
 		// If we get any error, the connection very probably died. Even if that's not the case,
 		// we should stop the client and give the reason for the shutdown
 		if err != nil {
-			go func() { _ = s.close(fmt.Errorf("read loop died: %w", util.ParseGrpcError(err))) }()
+			go func() { _ = s.close(util.ParseGrpcError(err)) }()
 			return
 		}
 

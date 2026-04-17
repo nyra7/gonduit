@@ -163,7 +163,7 @@ func (m *Manager) FindHandler(name string) (Handler, error) {
 			return handler, nil
 		}
 	}
-	return nil, NewError(ErrUnknownHandler, "unknown command: %s. Type 'help' for available builtin", name)
+	return nil, NewError(ErrUnknownHandler, "unknown command: %s. Type 'help' for available commands", name)
 }
 
 func (m *Manager) SetDimensions(cols, rows int) {

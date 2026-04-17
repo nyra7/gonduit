@@ -14,7 +14,7 @@ func MakeUploadCommand(app app.App) command.Handler {
 
 	args := []command.Argument{
 		command.NewArgument("local", "Local file path to upload", command.ArgTypeFile, true),
-		command.NewArgument("remote", "Remote destination path", command.ArgTypeString, false, "."),
+		command.NewArgument("remote", "Remote destination path", command.ArgTypeString, false),
 	}
 
 	flags := []command.Argument{

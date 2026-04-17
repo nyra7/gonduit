@@ -24,7 +24,7 @@ func GetOSInfo() (OSInfo, error) {
 	}
 	defer k.Close()
 
-	// Build number needed early — used for both version string and OS name detection
+	// Build number needed early, used for both version string and OS name detection
 	major, _, _ := k.GetIntegerValue("CurrentMajorVersionNumber")
 	minor, _, _ := k.GetIntegerValue("CurrentMinorVersionNumber")
 	currentBuild, _, _ := k.GetStringValue("CurrentBuild")

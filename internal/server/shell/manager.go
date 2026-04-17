@@ -35,7 +35,7 @@ func (m *Manager) ShellByID(id uint64) (*Shell, error) {
 	sh, ok := m.shells[id]
 
 	if !ok {
-		return nil, fmt.Errorf("no running path with id %d", id)
+		return nil, fmt.Errorf("no running shell with id %d", id)
 	}
 
 	return sh, nil
@@ -103,7 +103,7 @@ func (m *Manager) KillShell(id uint64) error {
 		return nil
 	}
 
-	return fmt.Errorf("no running path with id %d", id)
+	return fmt.Errorf("no running shell with id %d", id)
 
 }
 

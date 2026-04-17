@@ -48,7 +48,7 @@ func help(ctx *Context) (string, error) {
 
 	handler, err := m.FindHandler(commandName)
 	if err != nil {
-		return "", NewError(ErrInvalidArgument, "command '%s' not found. Type 'help' for available builtin", commandName)
+		return "", NewError(ErrInvalidArgument, "command '%s' not found. Type 'help' for available commands", commandName)
 	}
 
 	return formatDetailedHelp(handler, termCols), nil

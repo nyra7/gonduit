@@ -177,7 +177,8 @@ message TransferMetadata {
 message TransferResult {
   bool success = 1;
   string error = 2;
-  uint64 bytes_transferred = 3;
+  string path = 3;
+  uint64 bytes_transferred = 4;
 }
 
 message Empty {}
